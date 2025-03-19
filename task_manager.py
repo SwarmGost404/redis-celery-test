@@ -3,9 +3,9 @@ import json
 
 def add_task(task_name, args):
     """
-    Добавляет задачу в очередь.
+    Adds a task to the queue.
     """
-    # Подключение к MariaDB
+    # Connect to MariaDB
     conn = mysql.connector.connect(
         user='rq',
         password='Server',
@@ -14,11 +14,11 @@ def add_task(task_name, args):
     )
     cursor = conn.cursor()
 
-    # Добавление задачи
+    # Add the task
     query = "INSERT INTO tasks (task_name, args, status) VALUES (%s, %s, 'pending')"
     cursor.execute(query, (task_name, json.dumps(args)))
     conn.commit()
 
-    # Закрытие соединения
+    # Close the connection
     cursor.close()
     conn.close()
