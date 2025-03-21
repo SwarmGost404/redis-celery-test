@@ -89,6 +89,10 @@ class TaskQueue:
         """
         cursor = self.conn.cursor(dictionary=True)
         try:
+            # Начало транзакции для выбора задачи
+            self.conn.start_transaction()
+
+            # Выбор задачи
             cursor.execute(f"""
                 SELECT * FROM {self.config.db_table}
                 WHERE (status = %s OR (status = %s AND count_attempts < %s))
@@ -98,15 +102,23 @@ class TaskQueue:
             """, (TaskStatus.PENDING.value, TaskStatus.FAILED.value, self.config.max_attempts))
             task = cursor.fetchone()
 
+            # Фиксация транзакции (освобождаем блокировку)
+            self.conn.commit()
+
             if task:
+                # Обновление статуса задачи в отдельной транзакции
                 self.update_task_status(task['id'], TaskStatus.PROCESSING)
                 logging.debug(f"Задача {task['id']} взята на выполнение.")
+
             return task
+
         except Error as e:
-            logging.error(f"Ошибка при получении задачи: {e}")
+            # Откат транзакции в случае ошибки
             self.conn.rollback()
+            logging.error(f"Ошибка при получении задачи: {e}")
             raise
         finally:
+            # Закрытие курсора
             cursor.close()
 
     def update_task_status(self, task_id: int, status: TaskStatus):
@@ -124,7 +136,7 @@ class TaskQueue:
                     count_attempts = count_attempts + 1,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (status.value, task_id))  # Используем status.value вместо status.name
+            """, (status.value, task_id))  # Используем status.value
             self.conn.commit()
             logging.debug(f"Статус задачи {task_id} изменен на {status.value}.")
         except Error as e:
@@ -133,6 +145,7 @@ class TaskQueue:
             raise
         finally:
             cursor.close()
+            
     def cleanup_tasks(self):
         """
         Удаляет старые задачи:

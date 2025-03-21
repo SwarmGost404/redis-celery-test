@@ -29,7 +29,7 @@ def worker(config: TaskQueueConfig):
         else:
             # Если задач нет, ждем 1 секунду
             time.sleep(1)
-
+            
 
 if __name__ == "__main__":
     config = TaskQueueConfig(

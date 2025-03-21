@@ -1,7 +1,7 @@
 import logging
 from task_queue import TaskQueue
 from config import TaskQueueConfig
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

@@ -7,7 +7,7 @@ class TaskStatus(Enum):
     PROCESSING = "processing"
     FAILED = "failed"
     COMPLETED = "completed"
-
+    
 @dataclass
 class TaskQueueConfig:
     db_name: str
