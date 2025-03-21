@@ -79,7 +79,6 @@ class TaskQueue:
             logging.info(f"Table {self.config.db_table} successfully created or already exists.")
         except Error as e:
             logging.error(f"Error creating table: {e}")
-            self.conn.rollback()
             raise
         finally:
             cursor.close()
@@ -100,7 +99,6 @@ class TaskQueue:
             logging.info(f"Task '{task_name}' added.")
         except Error as e:
             logging.error(f"Error adding task: {e}")
-            self.conn.rollback()
             raise
         finally:
             cursor.close()
@@ -164,7 +162,6 @@ class TaskQueue:
             logging.debug(f"Task {task_id} status updated to {status.value}.")
         except Error as e:
             logging.error(f"Error updating task status: {e}")
-            self.conn.rollback()
             raise
         finally:
             cursor.close()
@@ -194,7 +191,7 @@ class TaskQueue:
             logging.info(f"Deleted {completed_count} completed and {failed_count} failed tasks.")
         except Error as e:
             logging.error(f"Error deleting tasks: {e}")
-            self.conn.rollback()
+
             raise
         finally:
             cursor.close()
