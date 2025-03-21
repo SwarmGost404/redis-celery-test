@@ -1,7 +1,6 @@
 import time
 import logging
-from task_queue import TaskQueue
-from config import TaskQueueConfig, TaskStatus
+from task_queue import TaskQueue, TaskQueueConfig, TaskStatus
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")

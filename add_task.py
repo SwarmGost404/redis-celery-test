@@ -1,6 +1,5 @@
 import logging
-from task_queue import TaskQueue
-from config import TaskQueueConfig
+from task_queue import TaskQueue, TaskQueueConfig
 from typing import Dict, Any
 
 # Настройка логирования
