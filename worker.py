@@ -16,11 +16,11 @@ def worker(config: TaskQueueConfig):
         task = task_queue.fetch_task()
         if task:
             try:
-                logging.info(f"Выполняется задача {task['id']}: {task['task_name']}")
+                logging.info(f"task {task['id']}: {task['task_name']}")
                 # status 'completed'
                 task_queue.update_task_status(task['id'], TaskStatus.COMPLETED)
             except Exception as e:
-                logging.error(f"Ошибка при выполнении задачи {task['id']}: {e}")
+                logging.error(f"error task {task['id']}: {e}")
                 # status 'failed'
                 task_queue.update_task_status(task['id'], TaskStatus.FAILED)
         else:
