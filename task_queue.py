@@ -59,7 +59,7 @@ class TaskQueue:
         """
         cursor = self.conn.cursor()
         try:
-            # Динамически получаем значения статусов из Enum
+            # Dynamically get status values from Enum
             status_values = [status.value for status in TaskStatus]
             status_enum_str = ", ".join(f"'{status}'" for status in status_values)
 
@@ -72,7 +72,7 @@ class TaskQueue:
                     count_attempts INT NOT NULL DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX status_index (status)  -- Добавляем индекс на столбец status
+                    INDEX status_index (status)  -- Add index on status column
                 )
             """, (TaskStatus.PENDING.value,))
             logging.info(f"Table {self.config.db_table} successfully created or already exists.")
@@ -124,8 +124,8 @@ class TaskQueue:
             task = cursor.fetchone()
 
             if task:
-                # Update the task status
-                self.update_task_status(task['id'], TaskStatus.PROCESSING)
+                # Update the task status to PROCESSING and increment count_attempts
+                self.update_task_status(task['id'], TaskStatus.PROCESSING, increment_attempts=True)
                 logging.debug(f"Task {task['id']} taken for execution.")
 
             # Commit the transaction
@@ -142,22 +142,31 @@ class TaskQueue:
             # Close the cursor
             cursor.close()
 
-    def update_task_status(self, task_id: int, status: TaskStatus):
+    def update_task_status(self, task_id: int, status: TaskStatus, increment_attempts: bool = False):
         """
         Updates the status of a task.
 
         :param task_id: Task ID.
         :param status: New task status.
+        :param increment_attempts: Whether to increment the count_attempts (default: False).
         """
         cursor = self.conn.cursor()
         try:
-            cursor.execute(f"""
-                UPDATE {self.config.db_table}
-                SET status = %s,
-                    count_attempts = count_attempts + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (status.value, task_id))
+            if increment_attempts:
+                cursor.execute(f"""
+                    UPDATE {self.config.db_table}
+                    SET status = %s,
+                        count_attempts = count_attempts + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (status.value, task_id))
+            else:
+                cursor.execute(f"""
+                    UPDATE {self.config.db_table}
+                    SET status = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (status.value, task_id))
             logging.debug(f"Task {task_id} status updated to {status.value}.")
         except Error as e:
             logging.error(f"Error updating task status: {e}")
