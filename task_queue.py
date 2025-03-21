@@ -156,15 +156,13 @@ class TaskQueue:
                 cursor.execute(f"""
                     UPDATE {self.config.db_table}
                     SET status = %s,
-                        count_attempts = count_attempts + 1,
-                        updated_at = CURRENT_TIMESTAMP
+                        count_attempts = count_attempts + 1
                     WHERE id = %s
                 """, (status.value, task_id))
             else:
                 cursor.execute(f"""
                     UPDATE {self.config.db_table}
-                    SET status = %s,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET status = %s
                     WHERE id = %s
                 """, (status.value, task_id))
             logging.debug(f"Task {task_id} status updated to {status.value}.")
