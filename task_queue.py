@@ -2,9 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 import json
 import logging
-from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-
 from dataclasses import dataclass
 from enum import Enum
 
@@ -14,7 +12,8 @@ class TaskStatus(Enum):
     PROCESSING = "processing"
     FAILED = "failed"
     COMPLETED = "completed"
-    
+
+
 @dataclass
 class TaskQueueConfig:
     db_name: str
@@ -26,12 +25,13 @@ class TaskQueueConfig:
     delete_completed_after_days: int = 7
     delete_failed_after_days: int = 30
 
+
 class TaskQueue:
     def __init__(self, config: TaskQueueConfig):
         """
-        Инициализация TaskQueue.
+        Initializes TaskQueue.
 
-        :param config: Конфигурация TaskQueue.
+        :param config: TaskQueue configuration.
         """
         self.config = config
         self.conn = None
@@ -39,7 +39,7 @@ class TaskQueue:
         self._ensure_table_exists()
 
     def _connect(self):
-        """Устанавливает соединение с базой данных."""
+        """Establishes a connection to the database."""
         try:
             self.conn = mysql.connector.connect(
                 user=self.config.db_user,
@@ -47,14 +47,15 @@ class TaskQueue:
                 host=self.config.db_host,
                 database=self.config.db_name
             )
-            logging.info("Успешное подключение к базе данных.")
+            self.conn.autocommit = True  # Disable autocommit for transaction control
+            logging.info("Successfully connected to the database.")
         except Error as e:
-            logging.error(f"Ошибка подключения к базе данных: {e}")
+            logging.error(f"Error connecting to the database: {e}")
             raise
 
     def _ensure_table_exists(self):
         """
-        Проверяет, существует ли таблица, и создает её, если необходимо.
+        Checks if the table exists and creates it if necessary.
         """
         cursor = self.conn.cursor()
         try:
@@ -63,16 +64,21 @@ class TaskQueue:
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     task_name VARCHAR(255) NOT NULL,
                     args JSON NOT NULL,
-                    status ENUM('pending', 'processing', 'failed', 'completed') NOT NULL DEFAULT 'pending',
+                    status ENUM(%s, %s, %s, %s) NOT NULL DEFAULT %s,
                     count_attempts INT NOT NULL DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
-            """)
-            self.conn.commit()
-            logging.info(f"Таблица {self.config.db_table} успешно создана или уже существует.")
+            """, (
+                TaskStatus.PENDING.value,
+                TaskStatus.PROCESSING.value,
+                TaskStatus.FAILED.value,
+                TaskStatus.COMPLETED.value,
+                TaskStatus.PENDING.value
+            ))
+            logging.info(f"Table {self.config.db_table} successfully created or already exists.")
         except Error as e:
-            logging.error(f"Ошибка при создании таблицы: {e}")
+            logging.error(f"Error creating table: {e}")
             self.conn.rollback()
             raise
         finally:
@@ -80,10 +86,10 @@ class TaskQueue:
 
     def add_task(self, task_name: str, args: Dict[str, Any]):
         """
-        Добавляет новую задачу в очередь.
+        Adds a new task to the queue.
 
-        :param task_name: Имя задачи.
-        :param args: Аргументы задачи (должны быть JSON-сериализуемы).
+        :param task_name: Task name.
+        :param args: Task arguments (must be JSON-serializable).
         """
         cursor = self.conn.cursor()
         try:
@@ -91,10 +97,9 @@ class TaskQueue:
                 INSERT INTO {self.config.db_table} (task_name, args)
                 VALUES (%s, %s)
             """, (task_name, json.dumps(args)))
-            self.conn.commit()
-            logging.info(f"Задача '{task_name}' добавлена.")
+            logging.info(f"Task '{task_name}' added.")
         except Error as e:
-            logging.error(f"Ошибка при добавлении задачи: {e}")
+            logging.error(f"Error adding task: {e}")
             self.conn.rollback()
             raise
         finally:
@@ -102,16 +107,16 @@ class TaskQueue:
 
     def fetch_task(self) -> Optional[Dict[str, Any]]:
         """
-        Получает задачу для выполнения.
+        Fetches a task for execution.
 
-        :return: Словарь с данными задачи или None, если задач нет.
+        :return: A dictionary with task data or None if no tasks are available.
         """
         cursor = self.conn.cursor(dictionary=True)
         try:
-            # Начало транзакции для выбора задачи
+            # Start a transaction to select the task
             self.conn.start_transaction()
 
-            # Выбор задачи
+            # Select the task
             cursor.execute(f"""
                 SELECT * FROM {self.config.db_table}
                 WHERE (status = %s OR (status = %s AND count_attempts < %s))
@@ -121,31 +126,31 @@ class TaskQueue:
             """, (TaskStatus.PENDING.value, TaskStatus.FAILED.value, self.config.max_attempts))
             task = cursor.fetchone()
 
-            # Фиксация транзакции (освобождаем блокировку)
-            self.conn.commit()
-
             if task:
-                # Обновление статуса задачи в отдельной транзакции
+                # Update the task status
                 self.update_task_status(task['id'], TaskStatus.PROCESSING)
-                logging.debug(f"Задача {task['id']} взята на выполнение.")
+                logging.debug(f"Task {task['id']} taken for execution.")
+
+            # Commit the transaction
+            self.conn.commit()
 
             return task
 
         except Error as e:
-            # Откат транзакции в случае ошибки
+            # Rollback the transaction in case of an error
             self.conn.rollback()
-            logging.error(f"Ошибка при получении задачи: {e}")
+            logging.error(f"Error fetching task: {e}")
             raise
         finally:
-            # Закрытие курсора
+            # Close the cursor
             cursor.close()
 
     def update_task_status(self, task_id: int, status: TaskStatus):
         """
-        Обновляет статус задачи.
+        Updates the status of a task.
 
-        :param task_id: ID задачи.
-        :param status: Новый статус задачи.
+        :param task_id: Task ID.
+        :param status: New task status.
         """
         cursor = self.conn.cursor()
         try:
@@ -155,49 +160,48 @@ class TaskQueue:
                     count_attempts = count_attempts + 1,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (status.value, task_id))  # Используем status.value
-            self.conn.commit()
-            logging.debug(f"Статус задачи {task_id} изменен на {status.value}.")
+            """, (status.value, task_id))
+            logging.debug(f"Task {task_id} status updated to {status.value}.")
         except Error as e:
-            logging.error(f"Ошибка при обновлении статуса задачи: {e}")
+            logging.error(f"Error updating task status: {e}")
             self.conn.rollback()
             raise
         finally:
             cursor.close()
-            
+
     def cleanup_tasks(self):
         """
-        Удаляет старые задачи:
-        - Задачи со статусом 'completed' старше delete_completed_after_days дней.
-        - Задачи со статусом 'failed' и count_attempts >= max_attempts старше delete_failed_after_days дней.
+        Cleans up old tasks:
+        - Tasks with status 'completed' older than delete_completed_after_days days.
+        - Tasks with status 'failed' and count_attempts >= max_attempts older than delete_failed_after_days days.
         """
         cursor = self.conn.cursor()
         try:
-            # Удаляем завершенные задачи
+            # Delete completed tasks
             cursor.execute(f"""
-                DELETE FROM {self.config.db_table}
-                WHERE status = %s AND created_at < %s
-            """, (TaskStatus.COMPLETED.name, datetime.now() - timedelta(days=self.config.delete_completed_after_days)))
+                DELETE LOW_PRIORITY FROM {self.config.db_table}
+                WHERE status = %s AND created_at < DATE_ADD(NOW(), INTERVAL -%s DAY)
+            """, (TaskStatus.COMPLETED.value, self.config.delete_completed_after_days))
             completed_count = cursor.rowcount
 
-            # Удаляем проваленные задачи
+            # Delete failed tasks
             cursor.execute(f"""
-                DELETE FROM {self.config.db_table}
-                WHERE status = %s AND count_attempts >= %s AND created_at < %s
-            """, (TaskStatus.FAILED.name, self.config.max_attempts, datetime.now() - timedelta(days=self.config.delete_failed_after_days)))
+                DELETE LOW_PRIORITY FROM {self.config.db_table}
+                WHERE status = %s AND count_attempts >= %s AND created_at < DATE_ADD(NOW(), INTERVAL -%s DAY)
+            """, (TaskStatus.FAILED.value, self.config.max_attempts, self.config.delete_failed_after_days))
             failed_count = cursor.rowcount
 
-            self.conn.commit()
-            logging.info(f"Удалено {completed_count} завершенных и {failed_count} проваленных задач.")
+            logging.info(f"Deleted {completed_count} completed and {failed_count} failed tasks.")
         except Error as e:
-            logging.error(f"Ошибка при удалении задач: {e}")
+            logging.error(f"Error deleting tasks: {e}")
             self.conn.rollback()
             raise
         finally:
             cursor.close()
 
     def __del__(self):
-        """Закрывает соединение с базой данных при удалении объекта."""
+        """Closes the database connection when the object is deleted."""
         if self.conn:
             self.conn.close()
-            logging.info("Соединение с базой данных закрыто.")
+            logging.info("Database connection closed.")
+

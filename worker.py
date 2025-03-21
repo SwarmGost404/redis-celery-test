@@ -2,31 +2,29 @@ import time
 import logging
 from task_queue import TaskQueue, TaskQueueConfig, TaskStatus
 
-# Настройка логирования
+# logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def worker(config: TaskQueueConfig):
     """
-    Воркер для выполнения задач.
-
-    :param config: Конфигурация TaskQueue.
+    Worker for executing tasks.
+    :param config: TaskQueue configuration.
     """
     task_queue = TaskQueue(config)
     while True:
         task = task_queue.fetch_task()
         if task:
             try:
-                # Выполняем задачу (заглушка)
                 logging.info(f"Выполняется задача {task['id']}: {task['task_name']}")
-                # Обновляем статус задачи на 'completed'
+                # status 'completed'
                 task_queue.update_task_status(task['id'], TaskStatus.COMPLETED)
             except Exception as e:
                 logging.error(f"Ошибка при выполнении задачи {task['id']}: {e}")
-                # Обновляем статус задачи на 'failed'
+                # status 'failed'
                 task_queue.update_task_status(task['id'], TaskStatus.FAILED)
         else:
-            # Если задач нет, ждем 1 секунду
+            # if not exists task
             time.sleep(1)
             
 

@@ -2,17 +2,17 @@ import logging
 from task_queue import TaskQueue, TaskQueueConfig
 from typing import Dict, Any
 
-# Настройка логирования
+# logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def add_task(config: TaskQueueConfig, task_name: str, args: Dict[str, Any]):
     """
-    Добавляет задачу в очередь.
+    Adds a task to the queue.
 
-    :param config: Конфигурация TaskQueue.
-    :param task_name: Имя задачи.
-    :param args: Аргументы задачи.
+    :param config: TaskQueue configuration.
+    :param task_name: Task name.
+    :param args: Task arguments.
     """
     task_queue = TaskQueue(config)
     task_queue.add_task(task_name, args)
