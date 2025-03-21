@@ -152,19 +152,13 @@ class TaskQueue:
         """
         cursor = self.conn.cursor()
         try:
+            update_query = "status = %s"
+
             if increment_attempts:
-                cursor.execute(f"""
-                    UPDATE {self.config.db_table}
-                    SET status = %s,
-                        count_attempts = count_attempts + 1
-                    WHERE id = %s
-                """, (status.value, task_id))
-            else:
-                cursor.execute(f"""
-                    UPDATE {self.config.db_table}
-                    SET status = %s
-                    WHERE id = %s
-                """, (status.value, task_id))
+                update_query += ", count_attempts = count_attempts + 1"
+            cursor.execute(f"""UPDATE {self.config.db_table} 
+                            SET {update_query}
+                            WHERE id = %s""", (status.value, task_id))
             logging.debug(f"Task {task_id} status updated to {status.value}.")
         except Error as e:
             logging.error(f"Error updating task status: {e}")
