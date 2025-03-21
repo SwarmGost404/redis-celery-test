@@ -8,11 +8,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def add_task(config: TaskQueueConfig, task_name: str, args: Dict[str, Any]):
     """
-    Adds a task to the queue.
-
-    :param config: TaskQueue configuration.
-    :param task_name: Task name.
-    :param args: Task arguments.
+        Adds a task to the queue.
+        :param config: TaskQueue configuration.
+        :param task_name: Task name.
+        :param args: Task arguments.
     """
     task_queue = TaskQueue(config)
     task_queue.add_task(task_name, args)

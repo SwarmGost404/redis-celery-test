@@ -59,23 +59,22 @@ class TaskQueue:
         """
         cursor = self.conn.cursor()
         try:
+            # Динамически получаем значения статусов из Enum
+            status_values = [status.value for status in TaskStatus]
+            status_enum_str = ", ".join(f"'{status}'" for status in status_values)
+
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.config.db_table} (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     task_name VARCHAR(255) NOT NULL,
                     args JSON NOT NULL,
-                    status ENUM(%s, %s, %s, %s) NOT NULL DEFAULT %s,
+                    status ENUM({status_enum_str}) NOT NULL DEFAULT %s,
                     count_attempts INT NOT NULL DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX status_index (status)  -- Добавляем индекс на столбец status
                 )
-            """, (
-                TaskStatus.PENDING.value,
-                TaskStatus.PROCESSING.value,
-                TaskStatus.FAILED.value,
-                TaskStatus.COMPLETED.value,
-                TaskStatus.PENDING.value
-            ))
+            """, (TaskStatus.PENDING.value,))
             logging.info(f"Table {self.config.db_table} successfully created or already exists.")
         except Error as e:
             logging.error(f"Error creating table: {e}")
@@ -191,7 +190,6 @@ class TaskQueue:
             logging.info(f"Deleted {completed_count} completed and {failed_count} failed tasks.")
         except Error as e:
             logging.error(f"Error deleting tasks: {e}")
-
             raise
         finally:
             cursor.close()
@@ -201,4 +199,3 @@ class TaskQueue:
         if self.conn:
             self.conn.close()
             logging.info("Database connection closed.")
-
